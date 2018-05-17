@@ -1,94 +1,46 @@
-import React, { Component} from 'react'
+import React, {Component} from 'react'
+import axios from 'axios'
 import Messages from './Messages'
 import Toolbar from './Toolbar'
+import Compose from './Compose'
 
-const messageData = [
-  {
-    "id": 1,
-    "subject": "You can't input the protocol without calculating the mobile RSS protocol!",
-    "read": false,
-    "starred": true,
-    "labels": ["dev", "personal"]
-  },
-  {
-    "id": 2,
-    "subject": "connecting the system won't do anything, we need to input the mobile AI panel!",
-    "read": false,
-    "starred": false,
-    "selected": true,
-    "labels": []
-  },
-  {
-    "id": 3,
-    "subject": "Use the 1080p HTTP feed, then you can parse the cross-platform hard drive!",
-    "read": false,
-    "starred": true,
-    "labels": ["dev"]
-  },
-  {
-    "id": 4,
-    "subject": "We need to program the primary TCP hard drive!",
-    "read": true,
-    "starred": false,
-    "selected": true,
-    "labels": []
-  },
-  {
-    "id": 5,
-    "subject": "If we override the interface, we can get to the HTTP feed through the virtual EXE interface!",
-    "read": false,
-    "starred": false,
-    "labels": ["personal"]
-  },
-  {
-    "id": 6,
-    "subject": "We need to back up the wireless GB driver!",
-    "read": true,
-    "starred": true,
-    "labels": []
-  },
-  {
-    "id": 7,
-    "subject": "We need to index the mobile PCI bus!",
-    "read": true,
-    "starred": false,
-    "labels": ["dev", "personal"]
-  },
-  {
-    "id": 8,
-    "subject": "If we connect the sensor, we can get to the HDD port through the redundant IB firewall!",
-    "read": true,
-    "starred": true,
-    "labels": []
-  }
-]
+const request = (path, method = 'get', body = null) => {
+  let bearerToken = '';
+  const token = localStorage.getItem('token');
 
-const getLabels = (action, selected, currentLabels, activeLabel) => {
-  if (!selected || activeLabel === 'Apply label') return currentLabels
-  if (action === 'add'){
-    const labelExists = currentLabels.find(label => label === activeLabel)
-    const labels = labelExists ? currentLabels : [...currentLabels, activeLabel].sort()
-    return labels
+  if (token) {
+    bearerToken = `Bearer ${token}`;
   }
-  if (action === 'remove'){
-    const labels = currentLabels.filter(label => label !== activeLabel)
-    return labels
-  }
+
+  return axios(`http://localhost:8082/api/${path}`, {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': bearerToken
+    },
+    data: body
+  });
 }
 
-
-class MessageData extends Component {
+class Display extends Component {
   constructor() {
     super()
-     this.state = {messages: [], compose: false};
+    this.state = {
+      messages: [],
+      compose: false
+    };
   }
 
   componentDidMount = () => {
-  this.getMessages();
-}
+    this.getMessages();
+  }
 
   getMessages = () => {
-    this.setState({messages: messageData})
+    request('messages')
+      .then(response => {this.setState({messages: response.data})})
+      .catch(console.error);
+
   }
 
   getSelected = () => this.state.messages.filter(message => message.selected).map(message => message.id);
@@ -100,64 +52,83 @@ class MessageData extends Component {
 
   handleSelectAll = () => {
     let {messages} = this.state;
-    if (messages.every(data => data.selected)) {
-      messages = messages.map(message => ({...message, selected: false }));
-    } else {
-      messages = messages.map(message => ({...message, selected: true }));
-    }
-    this.setState({messages})
+   if (messages.every(data => data.selected)) {
+     messages = messages.map(message => ({...message, selected: false }));
+   } else {
+     messages = messages.map(message => ({...message, selected: true }));
+   }
+   this.setState({messages});
   }
 
   handleStar = id => {
-    const messages = this.state.messages.map(message => message.id === id ? {...message, starred: true} : message);
-    this.setState({messages})
+    request('messages', 'patch', {messageIds: [id], command: 'star'})
+      .then(response => {this.getMessages()})
+      .catch(console.error);
   }
 
   handleDelete = () => {
-      const messages = this.state.messages.filter(message => !message.selected)
-      this.setState({messages})
-    }
+    request('messages', 'patch', {messageIds: this.getSelected(), command: 'delete'})
+     .then(response => {this.getMessages()})
+     .catch(console.error);
+  }
 
   markAsRead = () => {
-      const messages = this.state.messages.map(message => ({...message, read: message.selected ? true : message.read }))
-      this.setState({messages})
-    }
+    request('messages', 'patch', {messageIds: this.getSelected(), command: 'read', read: true})
+       .then(response => {this.getMessages()})
+       .catch(console.error);
+  }
 
   markAsUnread = () => {
-      const messages = this.state.messages.map(message => ({...message, read: message.selected ? false : message.read }))
-      this.setState({messages})
-    }
+    request('messages', 'patch', {messageIds: this.getSelected(), command: 'read', read: false})
+      .then(response => {this.getMessages()})
+      .catch(console.error);
+  }
 
-    handleAddLabel = label => {
-      const messages = this.state.messages.map(message => ({...message, labels: getLabels('add',message.selected, message.labels,label)}))
-      this.setState({messages})
-    }
+  handleAddLabel = label => {
+    request('messages', 'patch', {messageIds: this.getSelected(), command: 'addLabel', label})
+      .then(response => {this.getMessages()})
+      .catch(console.error);
+  }
 
-    handleRemoveLabel = label => {
-      const messages = this.state.messages.map(message => ({...message, labels: getLabels('remove',message.selected, message.labels,label)}))
-      this.setState({messages})
-    }
+  handleRemoveLabel = label => {
+    request('messages', 'patch', {messageIds: this.getSelected(), command: 'removeLabel', label})
+     .then(response => {this.getMessages()})
+     .catch(console.error);
+  }
 
+  toggleCompose = () => {
+    this.setState({compose: !this.state.compose});
+  }
 
-render = () => {
-   const messages = this.state.messages;
-   const {
-     handleSelect,
-     handleSelectAll,
-     handleStar,
-     handleDelete,
-     handleAddLabel,
-     handleRemoveLabel,
-     markAsRead,
-     markAsUnread,
-   } = this;
-   return (
-     <div className="container">
-       <Toolbar {...{messages, handleSelectAll, handleDelete, handleAddLabel, handleRemoveLabel, markAsRead, markAsUnread}} />
-       <Messages {...{messages, handleSelect, handleSelectAll, handleStar}} />
-     </div>
-   );
- }
+  handleCompose = (subject, body) => {
+    request('messages', 'post', {subject, body})
+       .then(response => {this.getMessages()})
+       .catch(console.error);
+  }
+
+  render = () => {
+    const messages = this.state.messages;
+    const {
+      handleSelect,
+      handleSelectAll,
+      handleStar,
+      handleDelete,
+      handleAddLabel,
+      handleRemoveLabel,
+      markAsRead,
+      markAsUnread,
+      toggleCompose,
+      handleCompose
+    } = this;
+    return (<div className="container">
+      <Toolbar {...{messages, handleSelectAll, handleDelete, handleAddLabel, handleRemoveLabel, markAsRead, markAsUnread, toggleCompose}}/> {
+        this.state.compose
+          ? <Compose {...{toggleCompose, handleCompose}}/>
+          : null
+      }
+      <Messages {...{messages, handleSelect, handleSelectAll, handleStar}}/>
+    </div>);
+  }
 }
 
-export default MessageData
+export default Display

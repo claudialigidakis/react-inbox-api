@@ -1,9 +1,8 @@
-import React from 'react'
-import Messages from './Messages.js'
-
+import React from 'react';
+import Message from './Message';
 
 const Messages = ({messages, ...methods}) => {
-  return message.map(message => <Messages {...message} key={message.id} {...methods} />);
+  return messages.map(message => <Message {...message} key={message.id} {...methods} />);
 }
 
-export default Messages
+export default Messages;

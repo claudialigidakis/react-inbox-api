@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import Display from './components/Display.js'
+import Display from './componenets/Display.js'
 
 
 class App extends Component {
